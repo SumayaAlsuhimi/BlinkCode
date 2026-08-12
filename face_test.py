@@ -2,13 +2,14 @@ import cv2
 import mediapipe as mp
 import math
 
-# MediaPipe classes
+# -----------------------------
+# MediaPipe setup
+# -----------------------------
 BaseOptions = mp.tasks.BaseOptions
 FaceLandmarker = mp.tasks.vision.FaceLandmarker
 FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
 
-# Load model
 options = FaceLandmarkerOptions(
     base_options=BaseOptions(
         model_asset_path="face_landmarker.task"
@@ -18,7 +19,9 @@ options = FaceLandmarkerOptions(
 
 landmarker = FaceLandmarker.create_from_options(options)
 
+# -----------------------------
 # Open webcam
+# -----------------------------
 camera = cv2.VideoCapture(0)
 
 frame_timestamp_ms = 0
@@ -27,6 +30,9 @@ frame_timestamp_ms = 0
 EYE_THRESHOLD = 0.18
 
 
+# -----------------------------
+# Helper functions
+# -----------------------------
 def distance(p1, p2):
     return math.sqrt(
         (p1.x - p2.x) ** 2 +
@@ -51,6 +57,9 @@ def eye_ratio(face_landmarks, outer, inner, upper, lower):
     return vertical / horizontal
 
 
+# -----------------------------
+# Main loop
+# -----------------------------
 while True:
     ret, frame = camera.read()
 
@@ -58,10 +67,13 @@ while True:
         print("Could not read from camera")
         break
 
-    # Convert BGR to RGB
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # Convert OpenCV BGR image to RGB
+    rgb_frame = cv2.cvtColor(
+        frame,
+        cv2.COLOR_BGR2RGB
+    )
 
-    # Convert to MediaPipe image
+    # Convert frame to MediaPipe image
     mp_image = mp.Image(
         image_format=mp.ImageFormat.SRGB,
         data=rgb_frame
@@ -75,39 +87,50 @@ while True:
         frame_timestamp_ms
     )
 
-    eye_status = "NO FACE"
+    left_status = "NO FACE"
+    right_status = "NO FACE"
 
     if result.face_landmarks:
         face_landmarks = result.face_landmarks[0]
 
         h, w, _ = frame.shape
 
-        # Calculate eye ratios
+        # -----------------------------
+        # Calculate left eye ratio
+        # -----------------------------
         left_ratio = eye_ratio(
             face_landmarks,
-            33,    # outer
-            133,   # inner
-            159,   # upper
-            145    # lower
+            33,
+            133,
+            159,
+            145
         )
 
+        # -----------------------------
+        # Calculate right eye ratio
+        # -----------------------------
         right_ratio = eye_ratio(
             face_landmarks,
-            362,   # outer
-            263,   # inner
-            386,   # upper
-            374    # lower
+            362,
+            263,
+            386,
+            374
         )
 
-        average_ratio = (left_ratio + right_ratio) / 2
-
-        # Decide eye status
-        if average_ratio < EYE_THRESHOLD:
-            eye_status = "CLOSED"
+        # Decide each eye status separately
+        if left_ratio < EYE_THRESHOLD:
+            left_status = "CLOSED"
         else:
-            eye_status = "OPEN"
+            left_status = "OPEN"
 
-        # Eye points to draw
+        if right_ratio < EYE_THRESHOLD:
+            right_status = "CLOSED"
+        else:
+            right_status = "OPEN"
+
+        # -----------------------------
+        # Draw eye landmarks
+        # -----------------------------
         eye_points = [
             33, 133, 159, 145,
             362, 263, 386, 374
@@ -127,37 +150,66 @@ while True:
                 -1
             )
 
-        # Show eye ratio
+        # -----------------------------
+        # Show eye ratios
+        # -----------------------------
         cv2.putText(
             frame,
-            f"Eye Ratio: {average_ratio:.3f}",
-            (30, 80),
+            f"Left Ratio: {left_ratio:.3f}",
+            (30, 110),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
+            0.7,
             (255, 255, 255),
             2
         )
 
-    # Show OPEN / CLOSED
+        cv2.putText(
+            frame,
+            f"Right Ratio: {right_ratio:.3f}",
+            (30, 140),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2
+        )
+
+    # -----------------------------
+    # Show eye statuses
+    # -----------------------------
     cv2.putText(
         frame,
-        f"Eye Status: {eye_status}",
+        f"Left Eye: {left_status}",
         (30, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
-        1,
+        0.8,
         (0, 255, 0),
         2
     )
 
+    cv2.putText(
+        frame,
+        f"Right Eye: {right_status}",
+        (30, 75),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 0),
+        2
+    )
+
+    # Show camera
     cv2.imshow(
-        "EyeMorse - Eye Detection",
+        "BlinkCode - Eye Detection",
         frame
     )
 
+    # Press Q to quit
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
 
+# -----------------------------
+# Cleanup
+# -----------------------------
 camera.release()
 cv2.destroyAllWindows()
 landmarker.close()
