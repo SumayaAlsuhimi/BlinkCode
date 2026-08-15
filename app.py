@@ -557,30 +557,46 @@ def render_home():
         </div>
         """)
 
-        webrtc_ctx = webrtc_streamer(
-            key="eyemorse-camera",
-            video_processor_factory=EyeMorseProcessor,
+       webrtc_ctx = webrtc_streamer(
+    key="eyemorse-camera",
 
-            media_stream_constraints={
-                "video": {
-                    "width": {
-                        "ideal": 480
-                    },
-                    "height": {
-                        "ideal": 360
-                    },
-                    "frameRate": {
-                        "ideal": 24,
-                        "max": 30
-                    },
-                    "facingMode": "user"
-                },
-                "audio": False
+    video_processor_factory=EyeMorseProcessor,
+
+    rtc_configuration={
+        "iceServers": [
+            {
+                "urls": [
+                    "stun:stun.l.google.com:19302"
+                ]
+            }
+        ]
+    },
+
+    media_stream_constraints={
+        "video": {
+            "width": {
+                "ideal": 480
             },
 
-            desired_playing_state=True,
-            async_processing=True
-        )
+            "height": {
+                "ideal": 360
+            },
+
+            "frameRate": {
+                "ideal": 24,
+                "max": 30
+            },
+
+            "facingMode": "user"
+        },
+
+        "audio": False
+    },
+
+    desired_playing_state=True,
+
+    async_processing=True
+)
 
     with status_col:
         st.html(
