@@ -1,5 +1,6 @@
 import time
 import threading
+import platform
 from pathlib import Path
 
 import av
@@ -43,6 +44,19 @@ if "current_message" not in st.session_state:
 if "morse_inputs" not in st.session_state:
     st.session_state.morse_inputs = 0
 
+
+# =========================================================
+# PERFORMANCE TUNING
+# =========================================================
+
+IS_CLOUD = platform.system().lower() == "linux"
+
+VIDEO_WIDTH = 360 if IS_CLOUD else 480
+VIDEO_HEIGHT = 270 if IS_CLOUD else 360
+VIDEO_FPS = 18 if IS_CLOUD else 24
+
+DETECT_EVERY_N_FRAMES = 3 if IS_CLOUD else 2
+UI_REFRESH_SECONDS = 0.45 if IS_CLOUD else 0.30
 
 # =========================================================
 # MEDIAPIPE
@@ -127,6 +141,14 @@ class EyeMorseProcessor(VideoProcessorBase):
         )
 
         self.landmarker = FaceLandmarker.create_from_options(options)
+
+    def close(self):
+        try:
+            if getattr(self, "landmarker", None) is not None:
+                self.landmarker.close()
+                self.landmarker = None
+        except Exception:
+            pass
 
     def get_status(self):
         with self.lock:
@@ -284,10 +306,10 @@ class EyeMorseProcessor(VideoProcessorBase):
 
         image = cv2.flip(image, 1)
 
-        # Detect every second frame for lower latency
+        # Detect every Nth frame to reduce CPU and memory pressure
         self.frame_counter += 1
 
-        if self.frame_counter % 2 == 0:
+        if self.frame_counter % DETECT_EVERY_N_FRAMES == 0:
             rgb_image = cv2.cvtColor(
                 image,
                 cv2.COLOR_BGR2RGB
@@ -314,6 +336,9 @@ class EyeMorseProcessor(VideoProcessorBase):
                 )
             except Exception:
                 pass
+            finally:
+                del mp_image
+                del rgb_image
 
         with self.lock:
             face_landmarks = self.latest_landmarks
@@ -575,16 +600,16 @@ def render_home():
             media_stream_constraints={
                 "video": {
                     "width": {
-                        "ideal": 480
+                        "ideal": VIDEO_WIDTH
                     },
 
                     "height": {
-                        "ideal": 360
+                        "ideal": VIDEO_HEIGHT
                     },
 
                     "frameRate": {
-                        "ideal": 24,
-                        "max": 30
+                        "ideal": VIDEO_FPS,
+                        "max": 24
                     },
 
                     "facingMode": "user"
@@ -643,7 +668,7 @@ def render_home():
 
     result_placeholder = st.empty()
 
-    @st.fragment(run_every=0.30)
+    @st.fragment(run_every=UI_REFRESH_SECONDS)
     def live_interface():
 
         processor = (
