@@ -59,6 +59,24 @@ DETECT_EVERY_N_FRAMES = 3 if IS_CLOUD else 2
 UI_REFRESH_SECONDS = 0.45 if IS_CLOUD else 0.30
 
 # =========================================================
+# QUICK PHRASES
+# =========================================================
+
+QUICK_PHRASES = {
+    ".....": "أحتاج مساعدة",
+    "....-": "أريد ماء",
+    "...-.": "أشعر بألم",
+    "...--": "أحتاج طبيب",
+    "..-.-": "اتصل بعائلتي",
+    "..--.": "نعم",
+    "..---": "لا",
+    ".-...": "انتظر قليلًا",
+    ".-..-": "شكرًا",
+    ".-.-.": "أريد أن أرتاح",
+}
+
+
+# =========================================================
 # MEDIAPIPE
 # =========================================================
 
@@ -191,6 +209,20 @@ class EyeMorseProcessor(VideoProcessorBase):
     def confirm_letter(self):
         if not self.current_morse:
             self.last_action = "NO MORSE"
+            return
+
+        # Quick Phrase shortcut has priority over normal letters
+        if self.current_morse in QUICK_PHRASES:
+            phrase = QUICK_PHRASES[self.current_morse]
+
+            if self.message and not self.message.endswith(" "):
+                self.message += " "
+
+            self.message += phrase
+            self.last_action = f"PHRASE: {phrase}"
+
+            self.current_morse = ""
+            self.current_letter = ""
             return
 
         letter = decode_morse(
@@ -663,6 +695,12 @@ def render_home():
 
         Both Long = Clear
 
+        <span class="guide-separator">
+            |
+        </span>
+
+        5-Symbol Shortcut + Confirm = Quick Phrase
+
     </div>
     """)
 
@@ -902,28 +940,40 @@ def render_home():
             """
         )
 
+    # =========================================================
+    # ACTION BUTTONS
+    # =========================================================
+
+    buttons_container = st.container()
+
+    with buttons_container:
+
+        st.write("")
+
+        left_space, clear_col, speak_col, right_space = st.columns(
+            [1.4, 1.25, 1.25, 1.4],
+            gap="small"
+        )
+
+        with clear_col:
+            clear_clicked = st.button(
+                "🗑 Clear Message",
+                use_container_width=True,
+                key="home_clear"
+            )
+
+        with speak_col:
+            speak_clicked = st.button(
+                "🔊 Speak",
+                use_container_width=True,
+                key="home_speak"
+            )
+
+    # =========================================================
+    # LIVE INTERFACE
+    # =========================================================
+
     live_interface()
-
-    st.write("")
-
-    left_space, clear_col, speak_col, right_space = st.columns(
-        [1.4, 1.25, 1.25, 1.4],
-        gap="small"
-    )
-
-    with clear_col:
-        clear_clicked = st.button(
-            "🗑 Clear Message",
-            use_container_width=True,
-            key="home_clear"
-        )
-
-    with speak_col:
-        speak_clicked = st.button(
-            "🔊 Speak",
-            use_container_width=True,
-            key="home_speak"
-        )
 
     if clear_clicked:
 
@@ -938,8 +988,6 @@ def render_home():
 
         st.session_state.current_message = ""
         st.session_state.morse_inputs = 0
-
-        st.rerun()
 
     if speak_clicked:
 
@@ -957,6 +1005,7 @@ def render_home():
             message = st.session_state.current_message
 
         speak_message(message)
+
 
 
 # =========================================================
@@ -1087,6 +1136,90 @@ def render_morse():
 
     </section>
     """)
+
+    # =====================================================
+    # QUICK PHRASES
+    # =====================================================
+
+    st.html("""
+    <div class="explorer-heading">
+
+        <div class="section-title">
+            QUICK PHRASES
+        </div>
+
+        <div class="explorer-subtitle">
+            Use a short Morse shortcut, then confirm with both eyes.
+        </div>
+
+    </div>
+    """)
+
+    quick_phrase_cards = ""
+
+    for code, phrase in QUICK_PHRASES.items():
+
+        display_code = (
+            code
+            .replace(".", "•")
+            .replace("-", "—")
+        )
+
+        quick_phrase_cards += f"""
+        <div style="
+            padding:18px 20px;
+            border:1px solid rgba(216,170,41,.28);
+            border-radius:20px;
+            background:linear-gradient(145deg,#fffdf4 0%,#fff8d7 52%,#ffefb3 100%);
+            box-shadow:0 10px 24px rgba(123,88,0,.055);
+            text-align:center;
+        ">
+            <div style="
+                color:#8b7540;
+                font-size:9px;
+                font-weight:800;
+                letter-spacing:1.2px;
+                margin-bottom:8px;
+            ">
+                QUICK PHRASE
+            </div>
+
+            <div style="
+                color:#4b3510;
+                font-size:19px;
+                font-weight:800;
+                direction:rtl;
+                margin-bottom:9px;
+            ">
+                {phrase}
+            </div>
+
+            <div style="
+                color:#b97400;
+                font-family:Arial,Helvetica,sans-serif;
+                font-size:22px;
+                font-weight:700;
+                letter-spacing:6px;
+            ">
+                {display_code}
+            </div>
+        </div>
+        """
+
+    st.html(
+        f"""
+        <div style="
+            max-width:1000px;
+            margin:0 auto 34px;
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            gap:12px;
+        ">
+            {quick_phrase_cards}
+        </div>
+        """
+    )
+
 
     # Arabic Morse dictionary
     arabic_morse = {
